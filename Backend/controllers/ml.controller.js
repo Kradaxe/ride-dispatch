@@ -32,20 +32,21 @@ module.exports.predictDemand = async (req, res) => {
 
         const avgFare = fareResult._avg.fare || 250;
 
-        const prediction = await mlService.predictDemand(
-            hour,
-            dayOfWeek,
-            activeCaptains,
-            avgFare,
-            pickupArea
-        );
-
         const areaPredictions =
         await getBestDemandArea(
             hour,
             dayOfWeek,
             activeCaptains,
             avgFare
+        );
+
+        const prediction =
+        await mlService.predictDemand(
+            hour,
+            dayOfWeek,
+            activeCaptains,
+            avgFare,
+            areaPredictions.bestArea
         );
         
         const insight = getDemandInsight(
@@ -60,8 +61,7 @@ module.exports.predictDemand = async (req, res) => {
         hour,
         dayOfWeek,
         activeCaptains,
-        avgFare,
-        pickupArea
+        avgFare
         });
 
     } catch (err) {
