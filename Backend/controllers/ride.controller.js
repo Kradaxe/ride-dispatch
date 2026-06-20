@@ -2,7 +2,15 @@ const rideService = require('../services/ride.service');
 const { validationResult } = require('express-validator');
 const mapService = require('../services/maps.service');
 const { sendMessageToSocketId } = require('../socket');
-const rideModel = require('../models/ride.model');
+const prisma = require('../db/db');
+const demandService = require('../services/demand.services');
+const {
+    rankCaptains
+} = require('../services/dispatch.service');
+const {
+    dispatchRideToCaptains,
+    pendingDispatches
+} = require('../services/rideDispatch.service');
 
 
 module.exports.createRide = async (req, res) => {
@@ -11,30 +19,51 @@ module.exports.createRide = async (req, res) => {
         return res.status(400).json({ errors: errors.array() });
     }
 
-    const { userId, pickup, destination, vehicleType } = req.body;
+    const {pickup, destination, vehicleType } = req.body;
 
     try {
-        const ride = await rideService.createRide({ user: req.user._id, pickup, destination, vehicleType });
+        const ride = await rideService.createRide({ user: req.user.id, pickup, destination, vehicleType });
         res.status(201).json(ride);
 
-        const pickupCoordinates = await mapService.getAddressCoordinate(pickup);
-
-
-
+        const pickupCoordinates = await mapService.getAddressCoordinate(pickup); 
         const captainsInRadius = await mapService.getCaptainsInTheRadius(pickupCoordinates.ltd, pickupCoordinates.lng, 2);
+        
+        await demandService.recordDemand({
+            pickupArea: pickup,
+            activeCaptains: captainsInRadius.length,
+            fare: ride.fare
+        });
 
-        ride.otp = ""
+        const rideWithUser = await prisma.ride.findUnique({
+            where: {
+                id: ride.id
+            },
+            include: {
+                user: true
+            }
+        });
 
-        const rideWithUser = await rideModel.findOne({ _id: ride._id }).populate('user');
+        delete rideWithUser.otp;
 
-        captainsInRadius.map(captain => {
+        const rankedCaptains =
+        rankCaptains(
+            captainsInRadius,
+            pickupCoordinates.ltd,
+            pickupCoordinates.lng,
+            1
+        );
 
-            sendMessageToSocketId(captain.socketId, {
-                event: 'new-ride',
-                data: rideWithUser
-            })
+        console.log(
+            rankedCaptains.map(c => ({
+                name: c.firstname,
+                score: c.score
+            }))
+        );
 
-        })
+        await dispatchRideToCaptains(
+            rideWithUser,
+            rankedCaptains
+        );
 
     } catch (err) {
 
@@ -70,6 +99,7 @@ module.exports.confirmRide = async (req, res) => {
 
     try {
         const ride = await rideService.confirmRide({ rideId, captain: req.captain });
+        pendingDispatches.delete(rideId);
 
         sendMessageToSocketId(ride.user.socketId, {
             event: 'ride-confirmed',
@@ -95,7 +125,7 @@ module.exports.startRide = async (req, res) => {
     try {
         const ride = await rideService.startRide({ rideId, otp, captain: req.captain });
 
-        console.log(ride);
+        //console.log(ride);
 
         sendMessageToSocketId(ride.user.socketId, {
             event: 'ride-started',
@@ -129,5 +159,5 @@ module.exports.endRide = async (req, res) => {
         return res.status(200).json(ride);
     } catch (err) {
         return res.status(500).json({ message: err.message });
-    } s
+    }
 }

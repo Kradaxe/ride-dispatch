@@ -1,7 +1,6 @@
-const rideModel = require('../models/ride.model');
 const mapService = require('./maps.service');
-const bcrypt = require('bcrypt');
 const crypto = require('crypto');
+const prisma = require('../db/db');
 
 async function getFare(pickup, destination) {
 
@@ -54,23 +53,25 @@ function getOtp(num) {
 }
 
 
-module.exports.createRide = async ({
-    user, pickup, destination, vehicleType
-}) => {
-    if (!user || !pickup || !destination || !vehicleType) {
-        throw new Error('All fields are required');
-    }
+    module.exports.createRide = async ({
+        user, pickup, destination, vehicleType
+    }) => {
+        if (!user || !pickup || !destination || !vehicleType) {
+           throw new Error('All fields are required');
+        }
 
-    const fare = await getFare(pickup, destination);
+        const fare = await getFare(pickup, destination);
 
 
 
-    const ride = rideModel.create({
-        user,
-        pickup,
-        destination,
-        otp: getOtp(6),
-        fare: fare[ vehicleType ]
+        const ride = await prisma.ride.create({
+            data: {
+                userId : user,
+                pickup,
+                destination,
+                otp: getOtp(6),
+                fare: fare[ vehicleType ]
+            }
     })
 
     return ride;
@@ -83,16 +84,50 @@ module.exports.confirmRide = async ({
         throw new Error('Ride id is required');
     }
 
-    await rideModel.findOneAndUpdate({
-        _id: rideId
-    }, {
-        status: 'accepted',
-        captain: captain._id
+    const existingRide = await prisma.ride.findUnique({
+    where: {
+        id: rideId
+    }
+    });
+    
+    if (!existingRide) {
+        throw new Error('Ride not found');
+    }
+    
+    if (existingRide.status !== 'pending') {
+        throw new Error('Ride already accepted');
+    }
+
+    await prisma.ride.update({
+        where: {
+            id: rideId
+        },
+        data: {
+            status: 'accepted',
+            captainId: captain.id
+        }
     })
 
-    const ride = await rideModel.findOne({
-        _id: rideId
-    }).populate('user').populate('captain').select('+otp');
+    const ride = await prisma.ride.findUnique({
+        where: {
+            id: rideId
+        },
+        include: {
+            user: true,
+            captain: true
+        }
+    });
+
+    await prisma.captain.update({
+        where: {
+            id: captain.id
+        },
+        data: {
+            acceptedRides: {
+                increment: 1
+            }
+        }
+    });
 
     if (!ride) {
         throw new Error('Ride not found');
@@ -107,9 +142,16 @@ module.exports.startRide = async ({ rideId, otp, captain }) => {
         throw new Error('Ride id and OTP are required');
     }
 
-    const ride = await rideModel.findOne({
-        _id: rideId
-    }).populate('user').populate('captain').select('+otp');
+    const ride = await prisma.ride.findFirst({
+        where: {
+            id: rideId,
+            captainId: captain.id
+        },
+        include: {
+            user: true,
+            captain: true
+        }
+    });
 
     if (!ride) {
         throw new Error('Ride not found');
@@ -123,11 +165,15 @@ module.exports.startRide = async ({ rideId, otp, captain }) => {
         throw new Error('Invalid OTP');
     }
 
-    await rideModel.findOneAndUpdate({
-        _id: rideId
-    }, {
-        status: 'ongoing'
+    await prisma.ride.update({
+        where: {
+            id: rideId
+        },
+        data: {
+            status: 'ongoing'
+        }
     })
+    ride.status = 'ongoing';
 
     return ride;
 }
@@ -137,10 +183,16 @@ module.exports.endRide = async ({ rideId, captain }) => {
         throw new Error('Ride id is required');
     }
 
-    const ride = await rideModel.findOne({
-        _id: rideId,
-        captain: captain._id
-    }).populate('user').populate('captain').select('+otp');
+    const ride = await prisma.ride.findFirst({
+        where: {
+            id: rideId,
+            captainId: captain.id
+        },
+        include: {
+            user: true,
+            captain: true
+        }
+    });
 
     if (!ride) {
         throw new Error('Ride not found');
@@ -150,11 +202,28 @@ module.exports.endRide = async ({ rideId, captain }) => {
         throw new Error('Ride not ongoing');
     }
 
-    await rideModel.findOneAndUpdate({
-        _id: rideId
-    }, {
-        status: 'completed'
+    await prisma.ride.update({
+        where: {
+            id: rideId
+        },
+        data: {
+            status: 'completed'
+        }
     })
+
+    await prisma.captain.update({
+        where: {
+            id: captain.id
+        },
+        data: {
+            totalEarnings: {
+                increment: ride.fare
+            },
+            completedRides: {
+                increment: 1
+            }
+        }
+    });
 
     return ride;
 }

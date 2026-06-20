@@ -1,7 +1,12 @@
-const captainModel = require('../models/captain.model');
 const captainService = require('../services/captain.service');
-const blackListTokenModel = require('../models/blackListToken.model');
 const { validationResult } = require('express-validator');
+const prisma = require('../db/db');
+
+const {
+    hashPassword,
+    comparePassword,
+    generateAuthToken
+} = require('../utils/auth.utils');
 
 
 module.exports.registerCaptain = async (req, res, next) => {
@@ -13,14 +18,14 @@ module.exports.registerCaptain = async (req, res, next) => {
 
     const { fullname, email, password, vehicle } = req.body;
 
-    const isCaptainAlreadyExist = await captainModel.findOne({ email });
+    const isCaptainAlreadyExist = await prisma.captain.findUnique({ where: { email } });
 
     if (isCaptainAlreadyExist) {
         return res.status(400).json({ message: 'Captain already exist' });
     }
 
 
-    const hashedPassword = await captainModel.hashPassword(password);
+    const hashedPassword = await hashPassword(password);
 
     const captain = await captainService.createCaptain({
         firstname: fullname.firstname,
@@ -33,7 +38,8 @@ module.exports.registerCaptain = async (req, res, next) => {
         vehicleType: vehicle.vehicleType
     });
 
-    const token = captain.generateAuthToken();
+    const token = generateAuthToken(captain.id);
+    delete captain.password;
 
     res.status(201).json({ token, captain });
 
@@ -47,19 +53,20 @@ module.exports.loginCaptain = async (req, res, next) => {
 
     const { email, password } = req.body;
 
-    const captain = await captainModel.findOne({ email }).select('+password');
+    const captain = await prisma.captain.findUnique({ where: { email } });
 
     if (!captain) {
         return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const isMatch = await captain.comparePassword(password);
+    const isMatch = await comparePassword(password, captain.password);
 
     if (!isMatch) {
         return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const token = captain.generateAuthToken();
+    const token = generateAuthToken(captain.id);
+    delete captain.password;
 
     res.cookie('token', token);
 
@@ -73,7 +80,7 @@ module.exports.getCaptainProfile = async (req, res, next) => {
 module.exports.logoutCaptain = async (req, res, next) => {
     const token = req.cookies.token || req.headers.authorization?.split(' ')[ 1 ];
 
-    await blackListTokenModel.create({ token });
+    await prisma.blacklistToken.create({ data: { token } });
 
     res.clearCookie('token');
 

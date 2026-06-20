@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Captain" ADD COLUMN     "totalEarnings" DOUBLE PRECISION NOT NULL DEFAULT 0;

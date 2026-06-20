@@ -2,16 +2,16 @@ const axios = require('axios');
 const captainModel = require('../models/captain.model');
 
 module.exports.getAddressCoordinate = async (address) => {
-    const apiKey = process.env.GOOGLE_MAPS_API;
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
-
+    //const apiKey = process.env.GOOGLE_MAPS_API;
+    //const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
     try {
-        const response = await axios.get(url);
+        const response = await axios.get(
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=jsonv2`
+        );
         if (response.data.status === 'OK') {
-            const location = response.data.results[ 0 ].geometry.location;
             return {
-                ltd: location.lat,
-                lng: location.lng
+                ltd: parseFloat(response.data[0].lat),
+                lng: parseFloat(response.data[0].lon)
             };
         } else {
             throw new Error('Unable to fetch coordinates');
@@ -22,71 +22,123 @@ module.exports.getAddressCoordinate = async (address) => {
     }
 }
 
-module.exports.getDistanceTime = async (origin, destination) => {
-    if (!origin || !destination) {
-        throw new Error('Origin and destination are required');
-    }
+module.exports.getDistanceTime = async (
+        origin,
+        destination
+        ) => {
 
-    const apiKey = process.env.GOOGLE_MAPS_API;
+        const originCoords =
+            await getCoordinates(origin);
 
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(origin)}&destinations=${encodeURIComponent(destination)}&key=${apiKey}`;
+        const destinationCoords =
+            await getCoordinates(destination);
 
-    try {
-
+        const url =
+        `https://router.project-osrm.org/route/v1/driving/` +
+        `${originCoords.lng},${originCoords.lat};` +
+        `${destinationCoords.lng},${destinationCoords.lat}` +
+        `?overview=false`;
 
         const response = await axios.get(url);
-        if (response.data.status === 'OK') {
 
-            if (response.data.rows[ 0 ].elements[ 0 ].status === 'ZERO_RESULTS') {
-                throw new Error('No routes found');
+        const route =
+            response.data.routes[0];
+
+        return {
+            distance: {
+                value: route.distance
+            },
+            duration: {
+                value: route.duration
             }
-
-            return response.data.rows[ 0 ].elements[ 0 ];
-        } else {
-            throw new Error('Unable to fetch distance and time');
-        }
-
-    } catch (err) {
-        console.error(err);
-        throw err;
-    }
+        };
 }
 
-module.exports.getAutoCompleteSuggestions = async (input) => {
-    if (!input) {
-        throw new Error('query is required');
-    }
+module.exports.getAutoCompleteSuggestions =
+    async (input) => {
 
-    const apiKey = process.env.GOOGLE_MAPS_API;
-    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${apiKey}`;
+        const response =
+            await axios.get(
+                `https://photon.komoot.io/api/?q=${encodeURIComponent(input)}`
+            );
 
-    try {
-        const response = await axios.get(url);
-        if (response.data.status === 'OK') {
-            return response.data.predictions.map(prediction => prediction.description).filter(value => value);
-        } else {
-            throw new Error('Unable to fetch suggestions');
-        }
-    } catch (err) {
-        console.error(err);
-        throw err;
-    }
+        return response.data.features.map(
+            item => item.properties.name
+        );
+    };
+
+module.exports.getCaptainsInTheRadius =
+    async (lat, lng, radiusKm) => {
+
+        const captains =
+            await prisma.captain.findMany({
+                where: {
+                    latitude: {
+                        not: null
+                    },
+                    longitude: {
+                        not: null
+                    }
+                }
+            });
+
+        return captains.filter(captain => {
+
+            const distance =
+                calculateDistance(
+                    lat,
+                    lng,
+                    captain.latitude,
+                    captain.longitude
+                );
+
+            return distance <= radiusKm;
+
+        });
 }
 
-module.exports.getCaptainsInTheRadius = async (ltd, lng, radius) => {
+async function getCoordinates(address) {
 
-    // radius in km
+    const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=jsonv2`
+    );
 
+    return {
+        lat: response.data[0].lat,
+        lng: response.data[0].lon
+    };
+}
 
-    const captains = await captainModel.find({
-        location: {
-            $geoWithin: {
-                $centerSphere: [ [ ltd, lng ], radius / 6371 ]
-            }
-        }
-    });
+function calculateDistance(
+    lat1,
+    lon1,
+    lat2,
+    lon2
+) {
 
-    return captains;
+    const R = 6371;
 
+    const dLat =
+        (lat2 - lat1) *
+        Math.PI / 180;
 
+    const dLon =
+        (lon2 - lon1) *
+        Math.PI / 180;
+
+    const a =
+        Math.sin(dLat/2) *
+        Math.sin(dLat/2) +
+        Math.cos(lat1*Math.PI/180) *
+        Math.cos(lat2*Math.PI/180) *
+        Math.sin(dLon/2) *
+        Math.sin(dLon/2);
+
+    const c =
+        2 * Math.atan2(
+            Math.sqrt(a),
+            Math.sqrt(1-a)
+        );
+
+    return R * c;
 }

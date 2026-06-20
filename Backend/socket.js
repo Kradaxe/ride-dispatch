@@ -1,6 +1,5 @@
 const socketIo = require('socket.io');
-const userModel = require('./models/user.model');
-const captainModel = require('./models/captain.model');
+const prisma = require('./db/db');
 
 let io;
 
@@ -17,32 +16,64 @@ function initializeSocket(server) {
 
 
         socket.on('join', async (data) => {
+            //console.log('JOIN:', data);
             const { userId, userType } = data;
 
             if (userType === 'user') {
-                await userModel.findByIdAndUpdate(userId, { socketId: socket.id });
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: { socketId: socket.id }
+                });
             } else if (userType === 'captain') {
-                await captainModel.findByIdAndUpdate(userId, { socketId: socket.id });
+                await prisma.captain.update({
+                    where: { id: userId },
+                    data: { socketId: socket.id }
+                });
             }
         });
 
 
         socket.on('update-location-captain', async (data) => {
+
+            //console.log("LOCATION DATA:", data);
+            //console.log("userId =", data.userId);
             const { userId, location } = data;
 
-            if (!location || !location.ltd || !location.lng) {
+            if (!location || location.ltd == null || location.lng == null) {
                 return socket.emit('error', { message: 'Invalid location data' });
             }
 
-            await captainModel.findByIdAndUpdate(userId, {
-                location: {
-                    ltd: location.ltd,
-                    lng: location.lng
+            await prisma.captain.update({
+                where: {
+                    id: userId
+                },
+                data: {
+                    latitude: location.ltd,
+                    longitude: location.lng
                 }
             });
         });
 
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
+
+            await prisma.captain.updateMany({
+                where: {
+                    socketId: socket.id
+                },
+                data: {
+                    socketId: null
+                }
+            });
+        
+            await prisma.user.updateMany({
+                where: {
+                    socketId: socket.id
+                },
+                data: {
+                    socketId: null
+                }
+            });
+        
             console.log(`Client disconnected: ${socket.id}`);
         });
     });
@@ -50,7 +81,7 @@ function initializeSocket(server) {
 
 const sendMessageToSocketId = (socketId, messageObject) => {
 
-console.log(messageObject);
+//console.log(messageObject);
 
     if (io) {
         io.to(socketId).emit(messageObject.event, messageObject.data);

@@ -1,0 +1,112 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id String @id @default(uuid())
+
+  firstname String
+  lastname  String?
+
+  email    String  @unique
+  password String
+  socketId String?
+
+  rides Ride[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CaptainStatus {
+  active
+  inactive
+}
+
+enum VehicleType {
+  car
+  motorcycle
+  auto
+}
+
+model Captain {
+  id String @id @default(uuid())
+
+  firstname String
+  lastname  String?
+
+  email    String @unique
+  password String
+
+  socketId String?
+
+  status CaptainStatus @default(inactive)
+
+  vehicleColor    String
+  vehiclePlate    String
+  vehicleCapacity Int
+  vehicleType     VehicleType
+
+  latitude  Float?
+  longitude Float?
+
+  rides Ride[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BlacklistToken {
+  id String @id @default(uuid())
+
+  token String @unique
+
+  createdAt DateTime @default(now())
+}
+
+enum RideStatus {
+  pending
+  accepted
+  ongoing
+  completed
+  cancelled
+}
+
+model Ride {
+  id String @id @default(uuid())
+
+  pickup      String
+  destination String
+
+  fare Float
+
+  status RideStatus @default(pending)
+
+  duration Int?
+  distance Float?
+
+  paymentID String?
+  orderId   String?
+  signature String?
+
+  otp String
+
+  userId    String
+  captainId String?
+
+  user    User     @relation(fields: [userId], references: [id])
+  captain Captain? @relation(fields: [captainId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

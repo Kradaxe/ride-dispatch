@@ -64,14 +64,14 @@ const captainSchema = new mongoose.Schema({
             type: Number,
         },
         lng: {
-            type: Number,
+            type: Number,   
         }
     }
 })
 
 
 captainSchema.methods.generateAuthToken = function () {
-    const token = jwt.sign({ _id: this._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: this.id }, process.env.JWT_SECRET, { expiresIn: '24h' });
     return token;
 }
 

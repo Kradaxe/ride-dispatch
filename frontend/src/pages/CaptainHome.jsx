@@ -23,30 +23,36 @@ const CaptainHome = () => {
     const { captain } = useContext(CaptainDataContext)
 
     useEffect(() => {
-        socket.emit('join', {
-            userId: captain._id,
-            userType: 'captain'
-        })
-        const updateLocation = () => {
+
+    if (!captain?.id) return;
+    console.log("CAPTAIN OBJECT", captain);
+
+    socket.emit('join', {
+        userId: captain.id,
+        userType: 'captain'
+    });
+
+    const updateLocation = () => {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(position => {
-
                     socket.emit('update-location-captain', {
-                        userId: captain._id,
+                        userId: captain.id,
                         location: {
                             ltd: position.coords.latitude,
                             lng: position.coords.longitude
                         }
-                    })
-                })
+                    });
+                });
             }
-        }
+        };
 
-        const locationInterval = setInterval(updateLocation, 10000)
-        updateLocation()
+        updateLocation();
 
-        // return () => clearInterval(locationInterval)
-    }, [])
+        const locationInterval = setInterval(updateLocation, 10000);
+
+        return () => clearInterval(locationInterval);
+
+    }, [captain]);
 
     socket.on('new-ride', (data) => {
 
@@ -59,8 +65,8 @@ const CaptainHome = () => {
 
         const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/rides/confirm`, {
 
-            rideId: ride._id,
-            captainId: captain._id,
+            rideId: ride.id,
+            captainId: captain.id,
 
 
         }, {
