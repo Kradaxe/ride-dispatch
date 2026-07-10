@@ -14,6 +14,8 @@ This project began as a basic Uber clone and was gradually evolved into a more r
 * JWT-based authentication
 * Protected routes for riders and captains
 
+<img width="563" height="805" alt="Screenshot (69)" src="https://github.com/user-attachments/assets/4ee16367-5ca0-46af-8e52-34f0f937cf89" />
+
 ### Ride Lifecycle
 
 * Ride creation and fare estimation
@@ -40,6 +42,9 @@ This project began as a basic Uber clone and was gradually evolved into a more r
 
   * Ride requests are sent to the highest-ranked captain first
   * If unanswered, requests automatically move to the next available captain
+
+<img width="539" height="800" alt="Screenshot (70)" src="https://github.com/user-attachments/assets/3f7c00ae-1986-4c45-9700-c67f815ab956" />
+<img width="533" height="809" alt="Screenshot (71)" src="https://github.com/user-attachments/assets/06c616fd-06ad-4d00-a159-58e2ebc63aba" />
 
 ### Captain Analytics
 
@@ -231,9 +236,4 @@ Rather than building another CRUD-style clone, the goal of this project was to e
 
 The project evolved from a simple ride-booking application into an opportunity to experiment with dispatch algorithms, machine learning, and real-time system design.
 
-
-
-<img width="563" height="805" alt="Screenshot (69)" src="https://github.com/user-attachments/assets/4ee16367-5ca0-46af-8e52-34f0f937cf89" />
-<img width="539" height="800" alt="Screenshot (70)" src="https://github.com/user-attachments/assets/3f7c00ae-1986-4c45-9700-c67f815ab956" />
-<img width="533" height="809" alt="Screenshot (71)" src="https://github.com/user-attachments/assets/06c616fd-06ad-4d00-a159-58e2ebc63aba" />
 
