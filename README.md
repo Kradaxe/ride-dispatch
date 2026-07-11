@@ -1,3 +1,11 @@
+## Live Demo
+
+Frontend: https://ride-dispatch-ten.vercel.app/
+
+Backend API: https://ride-dispatch.onrender.com/
+
+---
+
 # AI-Powered Ride Dispatch Platform
 
 A full-stack ride-hailing platform inspired by Uber, extended with intelligent ride dispatching and machine learning-based demand prediction.
@@ -214,14 +222,6 @@ VITE_BASE_URL=
 * ETA prediction models
 * Ride recommendation engine
 * Fraud detection and anomaly monitoring
-
----
-
-## Live Demo
-
-Frontend: https://ride-dispatch-ten.vercel.app/
-
-Backend API: https://ride-dispatch.onrender.com/
 
 ---
 
